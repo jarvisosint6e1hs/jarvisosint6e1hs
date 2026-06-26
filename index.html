@@ -230,6 +230,26 @@
         .event-item .badge.site { background: #a29bfe22; border-color: #a29bfe; color: #a29bfe; }
         .event-item .badge.update { background: #feca5722; border-color: #feca57; color: #feca57; }
 
+        /* ===== ИГРА ===== */
+        .game-cell {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px 0;
+            font-size: 2em;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #00ffcc;
+        }
+        .game-cell:hover:not(:disabled) {
+            border-color: #00ffcc;
+            transform: scale(1.05);
+        }
+        .game-cell:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 700px) {
             h1 { font-size: 2.2em; }
             h2 { font-size: 1.5em; }
@@ -276,6 +296,7 @@
 <span class="info">Ожидаю команду... введите ник для поиска</span>
         </div>
     </div>
+
     <!-- ===== КАРТА ДАРКНЕТА ===== -->
     <div class="card">
         <h2>🧅 Карта даркнета</h2>
@@ -336,7 +357,27 @@
         <p><strong>👥 Пользователей в whitelist:</strong> <span id="user-count">5</span></p>
         <p style="color:#666; font-size:0.9em;">* Обновляется в реальном времени</p>
     </div>
-
+<!-- ===== ИГРА ===== -->
+<div class="card" id="game">
+    <h2>🎮 Игра: Найди .onion</h2>
+    <p style="color:#888; margin-bottom:10px;">Найдите правильный .onion-адрес на карте. У вас есть 10 секунд!</p>
+    <div id="game-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; max-width:400px; margin:0 auto;">
+        <button class="game-cell" data-id="0">🔵</button>
+        <button class="game-cell" data-id="1">🔵</button>
+        <button class="game-cell" data-id="2">🔵</button>
+        <button class="game-cell" data-id="3">🔵</button>
+        <button class="game-cell" data-id="4">🔵</button>
+        <button class="game-cell" data-id="5">🔵</button>
+        <button class="game-cell" data-id="6">🔵</button>
+        <button class="game-cell" data-id="7">🔵</button>
+        <button class="game-cell" data-id="8">🔵</button>
+    </div>
+    <div style="text-align:center; margin-top:15px;">
+        <span id="game-timer" style="color:#ff6b6b; font-size:1.4em; font-weight:bold;">⏳ 10</span>
+        <button id="game-reset" class="btn btn-dark" style="margin-left:15px; padding:6px 20px;">🔄 Новая игра</button>
+    </div>
+    <div id="game-result" style="text-align:center; margin-top:12px; font-size:1.2em; color:#888;"></div>
+</div>
     <!-- ===== ПРИМЕРЫ ===== -->
     <div class="card">
         <h2>📸 Примеры работы</h2>
@@ -426,8 +467,64 @@ Ctrl+B → D</pre>
     </div>
 
 </div>
-<!-- ===== СКРИПТЫ ===== -->
+
+<!-- ===== ЧАТ-ВИДЖЕТ ===== -->
+<div style="position:fixed; bottom:20px; right:20px; width:320px; max-width:90%; z-index:999; background:#0d0d0d; border:1px solid #00ffcc; border-radius:16px; padding:16px; box-shadow:0 0 30px rgba(0,255,204,0.2);" id="chat-widget">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="color:#00ffcc; font-weight:bold;">🤖 J.A.R.V.I.S</span>
+        <button onclick="document.getElementById('chat-widget').style.display='none'" style="background:none; border:none; color:#666; font-size:1.2em; cursor:pointer;">✕</button>
+    </div>
+    <div id="chat-messages" style="height:150px; overflow-y:auto; background:#0a0a0a; border-radius:8px; padding:8px; margin-bottom:8px; font-size:0.9em; color:#aaa;">
+        <div style="color:#666; text-align:center;">💬 Напишите сообщение</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <input type="text" id="chat-input" placeholder="Введите сообщение..." style="flex:1; background:#0a0a0a; border:1px solid #2a2a2a; color:#00ffcc; padding:8px 12px; border-radius:8px; font-family:'Courier New',monospace;">
+        <button onclick="sendMessage()" style="background:#00ffcc; color:#0a0a0a; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">➤</button>
+    </div>
+    <div style="text-align:center; margin-top:8px; font-size:0.7em; color:#444;">
+        <a href="https://t.me/open_source_hunter_bot" target="_blank" style="color:#00ffcc;">Открыть в Telegram ↗</a>
+    </div>
+</div>
 <script>
+    // ---- ЧАТ ----
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+
+    function addMessage(text, isUser = true) {
+        const div = document.createElement('div');
+        div.style.padding = '4px 0';
+        div.style.color = isUser ? '#00ffcc' : '#888';
+        div.style.textAlign = isUser ? 'right' : 'left';
+        div.textContent = (isUser ? '🧑 ' : '🤖 ') + text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function sendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+        addMessage(text, true);
+        chatInput.value = '';
+
+        setTimeout(() => {
+            const responses = [
+                '🔍 Попробуйте /search <ник>',
+                '🖼️ Используйте /parse для парсинга .onion',
+                '📧 /email <почта> — проверка утечек',
+                'ℹ️ Напишите /start для меню',
+                '📸 Я могу парсить изображения с даркнета',
+                '🕵️ Sherlock ищет по 300+ платформам',
+                '🔐 Tor — запустите через меню бота',
+            ];
+            const reply = responses[Math.floor(Math.random() * responses.length)];
+            addMessage(reply, false);
+        }, 800);
+    }
+
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
     // ---- СИМУЛЯТОР OSINT ----
     const terminal = document.getElementById('osint-terminal');
     const input = document.getElementById('osint-input');
@@ -668,6 +765,84 @@ Ctrl+B → D</pre>
             eventsList.removeChild(eventsList.lastChild);
         }
     });
+
+    // ---- ИГРА "НАЙДИ .ONION" ----
+    (function() {
+        const cells = document.querySelectorAll('.game-cell');
+        const timerDisplay = document.getElementById('game-timer');
+        const resultDisplay = document.getElementById('game-result');
+        const resetBtn = document.getElementById('game-reset');
+
+        let onionIndex = -1;
+        let timeLeft = 10;
+        let timer = null;
+        let gameActive = false;
+
+        function startGame() {
+            clearInterval(timer);
+            timeLeft = 10;
+            timerDisplay.textContent = '⏳ 10';
+            resultDisplay.textContent = '';
+            gameActive = true;
+
+            onionIndex = Math.floor(Math.random() * 9);
+            cells.forEach((cell, i) => {
+                cell.textContent = '🔵';
+                cell.style.background = 'transparent';
+                cell.style.borderColor = '#2a2a2a';
+                cell.disabled = false;
+            });
+
+            timer = setInterval(() => {
+                timeLeft -= 1;
+                timerDisplay.textContent = '⏳ ' + timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    gameActive = false;
+                    cells.forEach(cell => cell.disabled = true);
+                    resultDisplay.innerHTML = '⏰ Время вышло! .onion был <strong style="color:#ff6b6b;">спрятан</strong>. Попробуйте снова.';
+                    cells[onionIndex].textContent = '🧅';
+                    cells[onionIndex].style.background = '#00ffcc22';
+                    cells[onionIndex].style.borderColor = '#00ffcc';
+                }
+            }, 1000);
+        }
+
+        function endGame(win, index) {
+            clearInterval(timer);
+            gameActive = false;
+            cells.forEach(cell => cell.disabled = true);
+
+            if (win) {
+                resultDisplay.innerHTML = '🎉 <strong style="color:#6bff6b;">Победа!</strong> Вы нашли .onion!';
+                cells[index].textContent = '🧅';
+                cells[index].style.background = '#00ffcc44';
+                cells[index].style.borderColor = '#6bff6b';
+            } else {
+                resultDisplay.innerHTML = '😢 Не тот адрес. Попробуйте снова!';
+                cells[index].textContent = '❌';
+                cells[index].style.background = '#ff6b6b22';
+                cells[index].style.borderColor = '#ff6b6b';
+                cells[onionIndex].textContent = '🧅';
+                cells[onionIndex].style.background = '#00ffcc22';
+                cells[onionIndex].style.borderColor = '#00ffcc';
+            }
+        }
+
+        cells.forEach((cell, i) => {
+            cell.addEventListener('click', () => {
+                if (!gameActive) return;
+                if (i === onionIndex) {
+                    endGame(true, i);
+                } else {
+                    endGame(false, i);
+                }
+            });
+        });
+
+        resetBtn.addEventListener('click', startGame);
+        startGame();
+    })();
 </script>
 </body>
 </html>
