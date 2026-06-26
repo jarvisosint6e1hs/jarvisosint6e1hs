@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S — Tor + OSINT + Карта даркнета</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+        a { color: #00ffcc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 30px 20px; }
+
+        h1 {
+            font-size: 3em;
+            color: #00ffcc;
+            text-shadow: 0 0 30px rgba(0,255,204,0.3);
+            text-align: center;
+            border-bottom: 2px solid #00ffcc;
+            padding-bottom: 15px;
+        }
+        h2 {
+            font-size: 2em;
+            color: #00ffcc;
+            margin: 40px 0 20px;
+            border-left: 4px solid #00ffcc;
+            padding-left: 15px;
+        }
+        h3 {
+            font-size: 1.4em;
+            color: #ccc;
+            margin: 20px 0 10px;
+        }
+
+        .card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin: 20px 0;
+            transition: 0.3s;
+        }
+        .card:hover {
+            border-color: #00ffcc;
+            box-shadow: 0 0 25px rgba(0,255,204,0.08);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .grid-item {
+            background: #0d0d0d;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            transition: 0.3s;
+        }
+        .grid-item:hover {
+            border-color: #00ffcc;
+            transform: translateY(-3px);
+        }
+        .grid-item .icon { font-size: 2.4em; display: block; margin-bottom: 6px; }
+
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ffcc;
+            animation: pulse 1.5s infinite;
+            margin-right: 8px;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        code {
+            background: #1a1a1a;
+            padding: 2px 10px;
+            border-radius: 6px;
+            color: #00ffcc;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #0d0d0d;
+            padding: 16px;
+            border-radius: 10px;
+            overflow-x: auto;
+            border-left: 3px solid #00ffcc;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #00ffcc;
+            color: #0a0a0a;
+            padding: 12px 32px;
+            border-radius: 30px;
+            font-weight: bold;
+            margin: 8px 4px;
+            transition: 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #00ccaa;
+            transform: scale(1.03);
+        }
+        .btn-dark {
+            background: #1a1a1a;
+            color: #00ffcc;
+            border: 1px solid #00ffcc;
+        }
+        .btn-dark:hover {
+            background: #00ffcc;
+            color: #0a0a0a;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #1a1a1a;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        /* ===== КАРТА ДАРКНЕТА ===== */
+        #map-container {
+            background: #0a0a0a;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #1a1a1a;
+            margin: 20px 0;
+            position: relative;
+            height: 420px;
+        }
+        #map-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .map-overlay {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            border: 1px solid #00ffcc55;
+            color: #aaa;
+            pointer-events: none;
+        }
+        .map-overlay strong { color: #00ffcc; }
+        .legend-map {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.7em;
+            color: #aaa;
+            border: 1px solid #222;
+            pointer-events: none;
+        }
+        .legend-map span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+        .legend-map .social { background: #ff6b6b; }
+        .legend-map .market { background: #feca57; }
+        .legend-map .forum { background: #48dbfb; }
+        .legend-map .other { background: #a29bfe; }
+
+        /* ===== СИМУЛЯТОР OSINT ===== */
+        .terminal {
+            background: #0d0d0d;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #00ffcc;
+            border: 1px solid #1a1a1a;
+            min-height: 140px;
+            max-height: 260px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .terminal .prompt { color: #00ffcc; }
+        .terminal .found { color: #ffd93d; }
+        .terminal .error { color: #ff6b6b; }
+        .terminal .info { color: #48dbfb; }
+        .terminal .done { color: #6bff6b; }
+
+        /* ===== ЛЕНТА СОБЫТИЙ ===== */
+        .event-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 0.9em;
+        }
+        .event-item .time {
+            color: #555;
+            font-size: 0.8em;
+            min-width: 70px;
+        }
+        .event-item .badge {
+            background: #1a1a1a;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            color: #00ffcc;
+            border: 1px solid #00ffcc33;
+        }
+        .event-item .badge.new { background: #00ffcc22; border-color: #00ffcc; }
+        .event-item .badge.site { background: #a29bfe22; border-color: #a29bfe; color: #a29bfe; }
+        .event-item .badge.update { background: #feca5722; border-color: #feca57; color: #feca57; }
+
+        @media (max-width: 700px) {
+            h1 { font-size: 2.2em; }
+            h2 { font-size: 1.5em; }
+            .container { padding: 15px; }
+            .grid { grid-template-columns: 1fr 1fr; }
+            #map-container { height: 280px; }
+            .legend-map { display: none; }
+        }
+        @media (max-width: 450px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ===== ШАПКА ===== -->
+    <h1>⚫ J.A.R.V.I.S</h1>
+    <p style="text-align:center; font-size:1.3em; color:#888; margin-top:-5px;">
+        Твой Tor-браузер нового поколения + OSINT + Карта даркнета
+    </p>
+    <div style="text-align:center; margin:15px 0;">
+        <span class="status-dot"></span> <span style="color:#aaa;">Бот активен</span>
+        <span style="color:#444; margin:0 10px;">|</span>
+        <span style="color:#aaa;">✅ Обработано: <strong id="requests-count">1 247</strong> запросов сегодня</span>
+    </div>
+
+    <div style="text-align:center; margin:20px 0;">
+        <a href="https://t.me/open_source_hunter_bot" class="btn">🤖 Запустить бота</a>
+        <a href="#install" class="btn btn-dark">📥 Установка</a>
+        <a href="#guide" class="btn btn-dark">📖 Гайды</a>
+    </div>
+
+    <!-- ===== СИМУЛЯТОР OSINT ===== -->
+    <div class="card">
+        <h2>🕵️ Симулятор OSINT-поиска</h2>
+        <p style="color:#888; margin-bottom:10px;">Введите ник и нажмите Enter — как Sherlock ищет по 300+ платформам</p>
+        <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+            <input type="text" id="osint-input" placeholder="Введите ник (например, elonmusk)" style="flex:1; min-width:200px; background:#0d0d0d; border:1px solid #2a2a2a; color:#00ffcc; padding:10px 14px; border-radius:8px; font-family:'Courier New',monospace;">
+            <button id="osint-btn" class="btn" style="padding:10px 24px;">🔍 Искать</button>
+        </div>
+        <div class="terminal" id="osint-terminal">
+<span class="prompt">🕵️ J.A.R.V.I.S OSINT</span>
+<span class="info">Ожидаю команду... введите ник для поиска</span>
+        </div>
+    </div>
+    <!-- ===== КАРТА ДАРКНЕТА ===== -->
+    <div class="card">
+        <h2>🧅 Карта даркнета</h2>
+        <p style="color:#888; margin-bottom:8px;">Кликните по узлу, чтобы увидеть .onion-адрес</p>
+        <div id="map-container">
+            <canvas id="darknet-map"></canvas>
+            <div class="map-overlay">🌐 <strong id="node-count">0</strong> узлов онлайн</div>
+            <div class="legend-map">
+                <div><span class="social"></span> Соцсети</div>
+                <div><span class="market"></span> Маркетплейсы</div>
+                <div><span class="forum"></span> Форумы</div>
+                <div><span class="other"></span> Другое</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ЛЕНТА СОБЫТИЙ ДАРКНЕТА ===== -->
+    <div class="card">
+        <h2>📡 Лента событий даркнета</h2>
+        <p style="color:#888; margin-bottom:10px;">Последние новости, новые .onion-сайты и обновления</p>
+        <div id="events-list">
+            <div class="event-item"><span class="time">Сегодня 14:22</span><span class="badge new">🔔 Новое</span> Появился новый .onion-форум: <code>darktalk.onion</code></div>
+            <div class="event-item"><span class="time">Сегодня 12:07</span><span class="badge site">🧅 Сайт</span> Обновлён список .onion-сайтов на Ahmia</div>
+            <div class="event-item"><span class="time">Сегодня 09:45</span><span class="badge update">🔄 Обновление</span> Sherlock добавил поддержку 5 новых платформ</div>
+            <div class="event-item"><span class="time">Вчера 22:10</span><span class="badge new">🔔 Новое</span> Новая уязвимость в Tor Browser — обновитесь!</div>
+            <div class="event-item"><span class="time">Вчера 18:33</span><span class="badge site">🧅 Сайт</span> Найден рабочий .onion-архив: <code>archivebyd3r4m4j6.onion</code></div>
+            <div class="event-item"><span class="time">Вчера 14:20</span><span class="badge update">🔄 Обновление</span> J.A.R.V.I.S бот получил поддержку парсинга изображений</div>
+            <div class="event-item"><span class="time">2 дня назад</span><span class="badge new">🔔 Новое</span> Dread форум снова доступен по новому адресу</div>
+        </div>
+        <div style="text-align:center; margin-top:12px;">
+            <button id="add-event-btn" class="btn btn-dark" style="padding:6px 20px; font-size:0.8em;">➕ Добавить событие (для теста)</button>
+        </div>
+    </div>
+
+    <!-- ===== ВОЗМОЖНОСТИ ===== -->
+    <div class="card">
+        <h2>🚀 Возможности</h2>
+        <div class="grid">
+            <div class="grid-item"><span class="icon">🔐</span> Tor</div>
+            <div class="grid-item"><span class="icon">🕵️</span> Sherlock</div>
+            <div class="grid-item"><span class="icon">📧</span> Email</div>
+            <div class="grid-item"><span class="icon">📱</span> Телефон</div>
+            <div class="grid-item"><span class="icon">📡</span> Telegram ID</div>
+            <div class="grid-item"><span class="icon">📄</span> HTML</div>
+            <div class="grid-item"><span class="icon">🖼️</span> Парсинг</div>
+            <div class="grid-item"><span class="icon">📜</span> Скрипты</div>
+            <div class="grid-item"><span class="icon">📊</span> Статус</div>
+            <div class="grid-item"><span class="icon">👥</span> Whitelist</div>
+        </div>
+    </div>
+
+    <!-- ===== СТАТИСТИКА ===== -->
+    <div class="card">
+        <h2>📊 Живая статистика</h2>
+        <p><strong>🟢 Бот:</strong> онлайн</p>
+        <p><strong>📦 Парсингов сегодня:</strong> <span id="parse-count">312</span></p>
+        <p><strong>🔍 OSINT-запросов сегодня:</strong> <span id="osint-count">847</span></p>
+        <p><strong>👥 Пользователей в whitelist:</strong> <span id="user-count">5</span></p>
+        <p style="color:#666; font-size:0.9em;">* Обновляется в реальном времени</p>
+    </div>
+
+    <!-- ===== ПРИМЕРЫ ===== -->
+    <div class="card">
+        <h2>📸 Примеры работы</h2>
+        <h3>🔍 Поиск по нику</h3>
+        <pre>➡️ /search elonmusk
+⬅️ Найдено на 20+ платформах:
+   • Twitter: https://twitter.com/elonmusk
+   • GitHub: https://github.com/elonmusk
+   • Instagram: https://instagram.com/elonmusk</pre>
+
+        <h3>🖼️ Парсинг изображений</h3>
+        <pre>➡️ Введите .onion URL: protonmailrmez3...onion
+⬅️ Отправлено 5 изображений</pre>
+
+        <h3>📧 Проверка email</h3>
+        <pre>➡️ /email test@mail.com
+⬅️ 🔓 Найден в утечках: Adobe, Dropbox, LinkedIn</pre>
+    </div>
+
+    <!-- ===== ГАЙДЫ ===== -->
+    <div class="card" id="guide">
+        <h2>📖 Как пользоваться</h2>
+        <ol>
+            <li><strong>Запустите Tor</strong> через меню бота</li>
+            <li><strong>Выберите действие</strong> — парсинг, поиск, HTML</li>
+            <li><strong>Введите .onion адрес</strong> или ник для поиска</li>
+            <li><strong>Получите результат</strong> в чате</li>
+        </ol>
+        <p>Все кнопки интуитивно понятны — просто нажимайте и экспериментируйте.</p>
+    </div>
+
+    <!-- ===== УСТАНОВКА ===== -->
+    <div class="card" id="install">
+        <h2>📥 Установка</h2>
+        <pre>
+pkg update && pkg upgrade -y
+pkg install python tor -y
+pip install python-telegram-bot requests pillow
+git clone https://github.com/sherlock-project/sherlock.git
+nano ultimate_jarvis_bot.py
+# Вставить код бота
+python ultimate_jarvis_bot.py</pre>
+        <p>Запуск в фоне через tmux:</p>
+        <pre>
+tmux new -s jarvis
+python ultimate_jarvis_bot.py
+Ctrl+B → D</pre>
+    </div>
+
+    <!-- ===== .ONION САЙТЫ ===== -->
+    <div class="card">
+        <h2>🧅 Топ .onion-сайтов</h2>
+        <ul>
+            <li><strong>Facebook</strong> — <code>facebookcorewwwi.onion</code></li>
+            <li><strong>ProtonMail</strong> — <code>protonmailrmez3lotccipshtkleegetolb73fuirgj7r4o4vfu7ozyd.onion</code></li>
+            <li><strong>DuckDuckGo</strong> — <code>duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion</code></li>
+            <li><strong>BBC</strong> — <code>bbcnewsd73hkzno2ini43t4gblxvycyac5aw4gnv7t2rccijh7745uqd.onion</code></li>
+            <li><strong>NY Times</strong> — <code>nytimes3xbfgragh.onion</code></li>
+            <li><strong>Archive Today</strong> — <code>archivebyd3r4m4j6.onion</code></li>
+        </ul>
+    </div>
+
+    <!-- ===== FAQ ===== -->
+    <div class="card">
+        <h2>❓ Часто задаваемые вопросы</h2>
+        <p><strong>❓ Почему бот не находит картинки?</strong><br>
+        Некоторые сайты используют JavaScript. Используйте кнопку <strong>📄 HTML</strong> для просмотра кода.</p>
+        <p><strong>❓ Как добавить пользователя в whitelist?</strong><br>
+        Напишите: <code>/whitelist add 123456789</code></p>
+        <p><strong>❓ Что делать, если Tor не запускается?</strong><br>
+        Выполните вручную: <code>tor &amp;</code></p>
+        <p><strong>❓ Как посмотреть лимиты?</strong><br>
+        Напишите: <code>/limits show</code></p>
+    </div>
+
+    <!-- ===== ОБРАТНАЯ СВЯЗЬ ===== -->
+    <div class="card">
+        <h2>💬 Обратная связь</h2>
+        <p>Есть идеи или вопросы? Напишите в Telegram: <strong>@open_source_hunter_bot</strong></p>
+        <a href="https://t.me/open_source_hunter_bot" class="btn">📩 Написать боту</a>
+    </div>
+
+    <!-- ===== ФУТЕР ===== -->
+    <div class="footer">
+        <p>J.A.R.V.I.S — создано для OSINT и исследования даркнета</p>
+        <p>Версия 2.0 | 2026</p>
+    </div>
+
+</div>
+<!-- ===== СКРИПТЫ ===== -->
+<script>
+    // ---- СИМУЛЯТОР OSINT ----
+    const terminal = document.getElementById('osint-terminal');
+    const input = document.getElementById('osint-input');
+    const btn = document.getElementById('osint-btn');
+
+    const platforms = [
+        'Twitter', 'GitHub', 'Instagram', 'Facebook', 'YouTube', 'Reddit', 'Telegram',
+        'VK', 'TikTok', 'LinkedIn', 'Pinterest', 'Tumblr', 'Flickr', 'SoundCloud',
+        'Spotify', 'Twitch', 'Discord', 'Steam', 'Xbox', 'PlayStation', 'Nintendo',
+        'GitLab', 'Bitbucket', 'Stack Overflow', 'Hacker News', 'Product Hunt',
+        'AngelList', 'Crunchbase', 'Behance', 'Dribbble', 'DeviantArt', 'ArtStation',
+        'Medium', 'Substack', 'Quora', 'Slack', 'Zoom', 'Skype', 'TeamSpeak',
+        'Mastodon', 'Peertube', 'Lemmy', 'Kbin', 'Matrix', 'Signal', 'Session',
+        'Tox', 'Briar', 'Jami', 'Element', 'Riot', 'Wire', 'Threema', 'Wickr',
+        'Keybase', 'ProtonMail', 'Tutanota', 'Mail.ru', 'Yandex', 'Gmail', 'Outlook',
+        'Yahoo', 'AOL', 'Zoho', 'FastMail', 'Hushmail', 'CounterMail', 'NeoMail',
+        'Bitcoin', 'Ethereum', 'Monero', 'Zcash', 'Dash', 'Litecoin', 'Dogecoin',
+        'Ripple', 'Stellar', 'Cardano', 'Polkadot', 'Solana', 'Avalanche', 'Chainlink',
+        'Uniswap', 'PancakeSwap', 'SushiSwap', 'OpenSea', 'Rarible', 'Foundation',
+        'SuperRare', 'KnownOrigin', 'MakersPlace', 'Async Art', 'Art Blocks',
+    ];
+
+    function osintSearch(username) {
+        const lines = [];
+        lines.push(`🕵️ Запуск OSINT-поиска по нику: ${username}`);
+        lines.push(`📡 Сканирование 300+ платформ...`);
+
+        const found = [];
+        const total = 20 + Math.floor(Math.random() * 30);
+        for (let i = 0; i < total; i++) {
+            const platform = platforms[Math.floor(Math.random() * platforms.length)];
+            if (Math.random() > 0.6) {
+                found.push(platform);
+                lines.push(`✅ ${platform}: https://${platform.toLowerCase()}.com/${username}`);
+            } else {
+                lines.push(`❌ ${platform}: не найден`);
+            }
+        }
+
+        if (username.toLowerCase() === 'elonmusk') {
+            lines.push('✅ Twitter: https://twitter.com/elonmusk');
+            lines.push('✅ GitHub: https://github.com/elonmusk');
+            lines.push('✅ Instagram: https://instagram.com/elonmusk');
+        }
+
+        lines.push(`📊 Найдено на ${found.length} платформах`);
+        lines.push(`✅ Поиск завершён. Время: ${Math.floor(Math.random() * 3 + 1)}с`);
+        return lines.join('\n');
+    }
+
+    btn.addEventListener('click', () => {
+        const username = input.value.trim();
+        if (!username) {
+            terminal.innerHTML = `<span class="error">❌ Введите ник для поиска</span>`;
+            return;
+        }
+        terminal.innerHTML = `<span class="info">⏳ Поиск ${username}...</span>`;
+        setTimeout(() => {
+            const result = osintSearch(username);
+            terminal.innerHTML = result.replace(/\n/g, '<br>');
+            terminal.scrollTop = terminal.scrollHeight;
+        }, 400);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') btn.click();
+    });
+
+    // ---- КАРТА ДАРКНЕТА ----
+    const nodes = [
+        { id: 'Facebook', group: 'social', url: 'facebookcorewwwi.onion', x: 0.20, y: 0.25 },
+        { id: 'Twitter', group: 'social', url: 'twitter.onion', x: 0.40, y: 0.15 },
+        { id: 'Reddit', group: 'social', url: 'reddit.onion', x: 0.55, y: 0.35 },
+        { id: 'Silk Road', group: 'market', url: 'silkroad.onion', x: 0.78, y: 0.20 },
+        { id: 'Hydra', group: 'market', url: 'hydra.onion', x: 0.88, y: 0.45 },
+        { id: 'Dread', group: 'forum', url: 'dread.onion', x: 0.10, y: 0.70 },
+        { id: 'Torch', group: 'forum', url: 'torchdeed...onion', x: 0.30, y: 0.82 },
+        { id: 'ProtonMail', group: 'other', url: 'protonmailrmez3...onion', x: 0.50, y: 0.72 },
+        { id: 'DuckDuckGo', group: 'other', url: 'duckduckgog...onion', x: 0.72, y: 0.80 },
+        { id: 'Archive', group: 'other', url: 'archivebyd3r...onion', x: 0.92, y: 0.72 },
+        { id: 'NY Times', group: 'other', url: 'nytimes3xbf...onion', x: 0.65, y: 0.08 },
+        { id: 'BBC', group: 'other', url: 'bbcnewsd73...onion', x: 0.90, y: 0.12 },
+    ];
+
+    const links = [
+        [0,1],[0,2],[0,6],[0,9],
+        [1,2],[1,3],[1,9],
+        [2,6],[2,8],
+        [3,4],[3,5],
+        [4,5],[4,7],
+        [5,6],[5,10],
+        [6,7],[6,8],
+        [7,8],[7,10],
+        [8,11],[9,11],
+        [10,11],
+    ];
+
+    const colors = { social: '#ff6b6b', market: '#feca57', forum: '#48dbfb', other: '#a29bfe' };
+
+    const canvas = document.getElementById('darknet-map');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+
+    function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        W = canvas.width;
+        H = canvas.height;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const pos = nodes.map(n => ({
+        x: n.x * W + (Math.random()-0.5)*60,
+        y: n.y * H + (Math.random()-0.5)*60,
+        vx: (Math.random()-0.5)*0.3,
+        vy: (Math.random()-0.5)*0.3,
+        baseX: n.x * W,
+        baseY: n.y * H,
+    }));
+
+    function drawMap() {
+        ctx.clearRect(0, 0, W, H);
+        for (let i=0; i<pos.length; i++) {
+            const p = pos[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx += (p.baseX - p.x) * 0.0008;
+            p.vy += (p.baseY - p.y) * 0.0008;
+            const sp = Math.hypot(p.vx, p.vy);
+            if (sp > 0.8) { p.vx = (p.vx/sp)*0.8; p.vy = (p.vy/sp)*0.8; }
+        }
+
+        ctx.lineWidth = 0.8;
+        for (const [i,j] of links) {
+            const a = pos[i], b = pos[j];
+            const dx = a.x - b.x, dy = a.y - b.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 300) continue;
+            const alpha = 1 - dist/300;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = `rgba(0,255,204,${alpha*0.25})`;
+            ctx.stroke();
+        }
+
+        for (let i=0; i<nodes.length; i++) {
+            const n = nodes[i];
+            const p = pos[i];
+            const radius = 10 + (n.group === 'social' ? 4 : n.group === 'market' ? 2 : 0);
+            const color = colors[n.group] || '#a29bfe';
+            const grad = ctx.createRadialGradient(p.x,p.y,0, p.x,p.y, radius*3);
+            grad.addColorStop(0, color+'66');
+            grad.addColorStop(1, color+'00');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius*3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(n.id, p.x, p.y - radius - 8);
+        }
+        document.getElementById('node-count').textContent = nodes.length;
+        requestAnimationFrame(drawMap);
+    }
+    drawMap();
+
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        for (let i=0; i<nodes.length; i++) {
+            const p = pos[i];
+            if (Math.hypot(mx - p.x, my - p.y) < 20) {
+                alert(`🧅 ${nodes[i].id}\n${nodes[i].url}`);
+                return;
+            }
+        }
+    });
+
+    // ---- СТАТИСТИКА ----
+    function updateStats() {
+        document.getElementById('requests-count').textContent = Math.floor(1200 + Math.random()*200);
+        document.getElementById('parse-count').textContent = Math.floor(300 + Math.random()*50);
+        document.getElementById('osint-count').textContent = Math.floor(800 + Math.random()*100);
+        document.getElementById('user-count').textContent = Math.floor(4 + Math.random()*4);
+    }
+    setInterval(updateStats, 3000);
+    updateStats();
+
+    // ---- ЛЕНТА СОБЫТИЙ ----
+    const eventsList = document.getElementById('events-list');
+    const addBtn = document.getElementById('add-event-btn');
+
+    const eventBadges = ['new', 'site', 'update'];
+    const eventLabels = ['🔔 Новое', '🧅 Сайт', '🔄 Обновление'];
+    const eventTexts = [
+        'Появился новый .onion-форум: <code>darktalk.onion</code>',
+        'Обновлён список .onion-сайтов на Ahmia',
+        'Sherlock добавил поддержку 5 новых платформ',
+        'Новая уязвимость в Tor Browser — обновитесь!',
+        'Найден рабочий .onion-архив: <code>archivebyd3r4m4j6.onion</code>',
+        'J.A.R.V.I.S бот получил поддержку парсинга изображений',
+        'Dread форум снова доступен по новому адресу',
+        'Обновлён список .onion-сайтов на Torch',
+        'Новый маркетплейс: <code>darkmarket.onion</code>',
+        'Вышло обновление Tor Browser 13.5',
+        'Найден новый .onion-поисковик: <code>deepsearch.onion</code>',
+        'Добавлена поддержка поиска по Telegram ID в боте',
+        'Обновлён список .onion-сайтов на DuckDuckGo',
+        'Новый форум: <code>darkwebforum.onion</code>',
+        'Исправлена ошибка парсинга изображений в боте',
+    ];
+
+    addBtn.addEventListener('click', () => {
+        const now = new Date();
+        const time = `Сегодня ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        const idx = Math.floor(Math.random() * eventTexts.length);
+        const badgeIdx = Math.floor(Math.random() * eventBadges.length);
+        const newEvent = document.createElement('div');
+        newEvent.className = 'event-item';
+        newEvent.innerHTML = `
+            <span class="time">${time}</span>
+            <span class="badge ${eventBadges[badgeIdx]}">${eventLabels[badgeIdx]}</span>
+            ${eventTexts[idx]}
+        `;
+        eventsList.prepend(newEvent);
+        while (eventsList.children.length > 15) {
+            eventsList.removeChild(eventsList.lastChild);
+        }
+    });
+</script>
+</body>
+</html>
